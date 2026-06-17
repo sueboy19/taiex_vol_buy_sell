@@ -211,14 +211,26 @@ def upsert_intraday_acc(rows: list[dict[str, Any]]) -> int:
 
 
 def get_merged_daily(start: date | None = None, end: date | None = None) -> list[dict[str, Any]]:
+    # TWSE 的 MI_MARGN 只提供「最新」融資融券（不支援歷史查詢），
+    # 且日線（MI_5MINS_HIST）較融資融券晚一天。為避免副圖全空，
+    # 將最新一筆融資融券套用至尚無資料的日線（COALESCE），隨每日累積會自動呈現真實走勢。
     sql = """
         SELECT k.date, k.open, k.high, k.low, k.close,
                v.volume, v.value, v.transactions,
-               m.margin_balance, m.margin_buy, m.margin_sell,
-               m.short_balance, m.short_buy, m.short_sell
+               COALESCE(m.margin_balance, lm.margin_balance) AS margin_balance,
+               COALESCE(m.margin_buy, lm.margin_buy) AS margin_buy,
+               COALESCE(m.margin_sell, lm.margin_sell) AS margin_sell,
+               COALESCE(m.short_balance, lm.short_balance) AS short_balance,
+               COALESCE(m.short_buy, lm.short_buy) AS short_buy,
+               COALESCE(m.short_sell, lm.short_sell) AS short_sell
         FROM daily_kline k
         LEFT JOIN daily_volume v ON k.date = v.date
         LEFT JOIN daily_margin m ON k.date = m.date
+        LEFT JOIN (
+            SELECT margin_balance, margin_buy, margin_sell,
+                   short_balance, short_buy, short_sell
+            FROM daily_margin ORDER BY date DESC LIMIT 1
+        ) lm ON TRUE
     """
     params: list[Any] = []
     clauses: list[str] = []

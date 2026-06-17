@@ -18,7 +18,6 @@ interface ChartProps {
   activeTool: string | null;
   onToolConsumed: () => void;
   clearSignal: number;
-  onCleared: () => void;
 }
 
 const CHART_ID = "taiex-chart";
@@ -32,13 +31,15 @@ export function Chart({
   activeTool,
   onToolConsumed,
   clearSignal,
-  onCleared,
 }: ChartProps): JSX.Element {
   const chartRef = useRef<Chart | null>(null);
   const barsRef = useRef<(DailyBar | MinuteBar)[]>([]);
   const overlaysRef = useRef<StoredOverlay[]>([]);
   const periodRef = useRef(period);
   periodRef.current = period;
+  const activeToolRef = useRef<string | null>(activeTool);
+  activeToolRef.current = activeTool;
+  const progressIdRef = useRef<string | null>(null);
 
   const restoreOverlays = useCallback((chart: Chart) => {
     overlaysRef.current = loadOverlays();
@@ -53,6 +54,37 @@ export function Chart({
       } as never);
     }
   }, []);
+
+  const startDrawing = useCallback(
+    (tool: string) => {
+      const chart = chartRef.current;
+      if (!chart) return;
+      const id = `ov_${Date.now()}_${uid++}`;
+      const createdId = chart.createOverlay({
+        id,
+        name: tool,
+        onDrawEnd: (event: { overlay?: { points?: unknown[] } }) => {
+          const pts = event?.overlay?.points ?? [];
+          if (pts.length > 0) {
+            overlaysRef.current.push({ id, name: tool, points: pts });
+            saveOverlays(overlaysRef.current);
+          }
+          progressIdRef.current = null;
+          // 工具仍選取中 → 接著畫下一條（微任務延後，避開 klinecharts 當下事件）
+          if (activeToolRef.current === tool) {
+            queueMicrotask(() => startDrawing(tool));
+          }
+          return false;
+        },
+      } as never);
+      if (createdId !== null) {
+        progressIdRef.current = id;
+      } else {
+        onToolConsumed();
+      }
+    },
+    [onToolConsumed],
+  );
 
   useEffect(() => {
     setupChartExtensions();
@@ -118,30 +150,24 @@ export function Chart({
 
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !activeTool) return;
-    const id = `ov_${Date.now()}_${uid++}`;
-    chart.createOverlay({
-      id,
-      name: activeTool,
-      onDrawEnd: (event: { points?: unknown[] }) => {
-        const points = (event as { points?: unknown[] })?.points ?? [];
-        if (points.length > 0) {
-          overlaysRef.current.push({ id, name: activeTool, points });
-          saveOverlays(overlaysRef.current);
-        }
-        onToolConsumed();
-        return false;
-      },
-    } as never);
-  }, [activeTool, onToolConsumed]);
+    if (!chart) return;
+    if (!activeTool) {
+      if (progressIdRef.current) {
+        chart.removeOverlay(progressIdRef.current);
+        progressIdRef.current = null;
+      }
+      return;
+    }
+    startDrawing(activeTool);
+  }, [activeTool, startDrawing]);
 
   useEffect(() => {
     if (clearSignal === 0) return;
     chartRef.current?.removeOverlay();
+    progressIdRef.current = null;
     overlaysRef.current = [];
     saveOverlays([]);
-    onCleared();
-  }, [clearSignal, onCleared]);
+  }, [clearSignal]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>

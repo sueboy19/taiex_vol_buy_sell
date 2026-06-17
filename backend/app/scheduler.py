@@ -138,6 +138,17 @@ async def job_backfill_check() -> None:
         if last is None or last < today:
             logger.info("backfill detected gap, fetching daily data...")
             await job_daily_fetch()
+    await backfill_minute_kline()
+
+
+async def backfill_minute_kline() -> None:
+    """收盤後補抓近日分鐘 K 線（Yahoo），讓「分鐘」圖不致全空。"""
+    if not is_trading_day():
+        return
+    bars = await yahoo_client.fetch_intraday_minute_kline("5d")
+    if bars:
+        db.upsert_minute_kline(bars)
+        logger.info("minute_kline backfilled: %d rows", len(bars))
 
 
 def start_scheduler() -> None:

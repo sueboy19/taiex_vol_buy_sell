@@ -16,14 +16,15 @@ _HEADERS = {
 }
 
 
-async def fetch_intraday_minute_kline() -> list[dict[str, Any]]:
-    """Yahoo Finance v8 chart API — 取得當日 1 分鐘 K 線（指數 OHLC）。
+async def fetch_intraday_minute_kline(range: str = "1d") -> list[dict[str, Any]]:
+    """Yahoo Finance v8 chart API — 取得分鐘 K 線（指數 OHLC）。
 
-    URL: /v8/finance/chart/^TWII?interval=1m&range=1d
+    URL: /v8/finance/chart/^TWII?interval=1m&range=<range>
+    預設 range=1d（當日盤中每分鐘）；收盤後可用 "5d" 補抓近日分鐘線。
     回傳 list of {ts, open, high, low, close}（volume 恆為 0，指數無量）
     """
     url = f"{settings.yahoo_chart_base}/v8/finance/chart/{settings.yahoo_index_symbol}"
-    params = {"interval": "1m", "range": "1d"}
+    params = {"interval": "1m", "range": range}
     try:
         async with httpx.AsyncClient(
             timeout=settings.http_timeout_sec, headers=_HEADERS, follow_redirects=True

@@ -15,7 +15,7 @@ export default function App(): JSX.Element {
   const { lastMessage, connected } = useRealtime(period === "minute");
 
   const handleToolSelect = useCallback((toolId: string) => {
-    setActiveTool(toolId);
+    setActiveTool((prev) => (prev === toolId ? null : toolId));
   }, []);
 
   const handleToolConsumed = useCallback(() => {
@@ -23,6 +23,7 @@ export default function App(): JSX.Element {
   }, []);
 
   const handleClear = useCallback(() => {
+    setActiveTool(null);
     setClearSignal((s) => s + 1);
   }, []);
 
@@ -50,7 +51,6 @@ export default function App(): JSX.Element {
           activeTool={activeTool}
           onToolConsumed={handleToolConsumed}
           clearSignal={clearSignal}
-          onCleared={() => {}}
         />
       </div>
     </div>
