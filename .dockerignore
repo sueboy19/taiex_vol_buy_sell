@@ -1,0 +1,12 @@
+**/__pycache__
+**/*.pyc
+**/.venv
+**/venv
+backend/data
+**/node_modules
+**/dist
+**/.env
+**/*.duckdb
+**/*.duckdb.wal
+.git
+.gitignore

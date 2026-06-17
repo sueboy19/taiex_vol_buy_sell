@@ -1,0 +1,39 @@
+# 正式環境 — Coolify Docker Compose 部署
+# Coolify 設定：Build Pack → Docker Compose → Location 指定此檔案
+# 在 Coolify UI 為 frontend service 指派網域
+# 不定義自訂 networks（Coolify 自動管理，自訂會導致 Traefik 路由問題）
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DUCKDB_PATH=/data/taiex.duckdb
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    volumes:
+      - type: volume
+        source: db-data
+        target: /data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  db-data:

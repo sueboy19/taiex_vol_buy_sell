@@ -1,0 +1,31 @@
+# 開發環境 — hot reload + Vite HMR
+# 使用：docker compose -f docker-compose.dev.yml up --build
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/data:/data
+    ports:
+      - "8000:8000"
+    environment:
+      - DUCKDB_PATH=/data/taiex.duckdb
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_PROXY_TARGET=http://backend:8000
+    depends_on:
+      - backend
+
+volumes:
+  frontend_node_modules:
