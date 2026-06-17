@@ -8,8 +8,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     environment:
+      - SERVICE_URL_BACKEND_8000=
       - DUCKDB_PATH=/data/taiex.duckdb
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - CORS_ORIGINS=${SERVICE_FQDN_BACKEND}
     volumes:
       - type: volume
         source: db-data
@@ -31,6 +32,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    environment:
+      - SERVICE_URL_FRONTEND_80=
     depends_on:
       backend:
         condition: service_healthy
