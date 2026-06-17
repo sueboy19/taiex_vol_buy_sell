@@ -8,6 +8,8 @@ interface ToolbarProps {
   onToolSelect: (toolId: string) => void;
   onClear: () => void;
   wsConnected: boolean;
+  redUp: boolean;
+  onToggleColor: () => void;
 }
 
 export function Toolbar({
@@ -17,6 +19,8 @@ export function Toolbar({
   onToolSelect,
   onClear,
   wsConnected,
+  redUp,
+  onToggleColor,
 }: ToolbarProps): JSX.Element {
   return (
     <div
@@ -67,6 +71,22 @@ export function Toolbar({
           {t.icon}
         </button>
       ))}
+
+      <button
+        title="切換漲跌顏色"
+        onClick={onToggleColor}
+        style={{
+          padding: "3px 10px",
+          background: "#2a2a2a",
+          color: "#fff",
+          border: "1px solid #3a3a3a",
+          borderRadius: 3,
+          cursor: "pointer",
+          fontSize: 13,
+        }}
+      >
+        {redUp ? "紅漲綠跌" : "綠漲紅跌"}
+      </button>
 
       <button
         title="清除所有畫線"

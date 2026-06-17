@@ -12,4 +12,5 @@ export const TOOLS: ToolDef[] = [
   { id: "verticalStraightLine", label: "垂直線", icon: "┃" },
   { id: "parallelStraightLine", label: "平行通道", icon: "║" },
   { id: "arrowLine", label: "箭頭", icon: "→" },
+  { id: "eraser", label: "橡皮擦", icon: "⌫" },
 ];

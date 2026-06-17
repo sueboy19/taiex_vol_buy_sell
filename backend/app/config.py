@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     yahoo_chart_base: str = "https://query1.finance.yahoo.com"
     finmind_base: str = "https://api.finmindtrade.com/api/v4/data"
     finmind_token: str = ""
+    taifex_base: str = "https://www.taifex.com.tw"
 
     twse_index_symbol: str = "tse_t00.tw"
     yahoo_index_symbol: str = "^TWII"
@@ -29,6 +30,7 @@ class Settings(BaseSettings):
 
     http_timeout_sec: float = 15.0
     http_min_interval_sec: float = 3.0
+    taifex_backfill_days: int = 90
 
     cors_origins: str = "*"
 

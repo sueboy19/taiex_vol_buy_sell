@@ -7,26 +7,44 @@ export function setupChartExtensions(): void {
   initialized = true;
 
   registerIndicator({
-    name: "MARGIN",
-    shortName: "融資融券",
+    name: "MARGIN_PURCHASE",
+    shortName: "融資餘額(億)",
+    baseValue: 0,
+    precision: 1,
+    calc: (dataList: Record<string, unknown>[]) =>
+      dataList.map((d) => ({
+        marginValue: ((d.margin_value as number) ?? 0) / 1e8,
+      })),
+    figures: [{ key: "marginValue", title: "融資(億): ", type: "bar", baseValue: 0 }],
+    styles: { bars: [{ noChangeColor: "#ef5350" }] } as never,
+  } as never);
+
+  registerIndicator({
+    name: "MARGIN_SHORTSALE",
+    shortName: "融券餘額(張)",
     baseValue: 0,
     precision: 0,
     calc: (dataList: Record<string, unknown>[]) =>
       dataList.map((d) => ({
-        marginBalance: (d.margin_balance as number) ?? 0,
-        shortBalance: -((d.short_balance as number) ?? 0),
+        shortBalance: (d.short_balance as number) ?? 0,
       })),
-    figures: [
-      { key: "marginBalance", title: "融資: ", type: "bar", baseValue: 0 },
-      { key: "shortBalance", title: "融券: ", type: "bar", baseValue: 0 },
-    ],
-    // klinecharts 的 bar 顏色取自 styles.bars[i].noChangeColor（依 figure 順序）
-    styles: {
-      bars: [
-        { noChangeColor: "#ef5350" },
-        { noChangeColor: "#26a69a" },
-      ],
-    } as never,
+    figures: [{ key: "shortBalance", title: "融券(張): ", type: "bar", baseValue: 0 }],
+    styles: { bars: [{ noChangeColor: "#26a69a" }] } as never,
+  } as never);
+
+  registerIndicator({
+    name: "FOREIGN_FUTURE",
+    shortName: "外資台指期未平倉",
+    baseValue: 0,
+    precision: 0,
+    minValue: -120000,
+    maxValue: 120000,
+    calc: (dataList: Record<string, unknown>[]) =>
+      dataList.map((d) => ({
+        netOi: (d.net_oi as number) ?? 0,
+      })),
+    figures: [{ key: "netOi", title: "外資未平倉(口): ", type: "bar", baseValue: 0 }],
+    styles: { bars: [{ noChangeColor: "#ab47bc" }] } as never,
   } as never);
 
   registerOverlay({

@@ -10,6 +10,7 @@ export default function App(): JSX.Element {
   const [period, setPeriod] = useState<Period>("day");
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [clearSignal, setClearSignal] = useState(0);
+  const [redUp, setRedUp] = useState(true);
 
   const { bars, loading, error } = useKlineData(period);
   const { lastMessage, connected } = useRealtime(period === "minute");
@@ -27,6 +28,10 @@ export default function App(): JSX.Element {
     setClearSignal((s) => s + 1);
   }, []);
 
+  const handleToggleColor = useCallback(() => {
+    setRedUp((r) => !r);
+  }, []);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#131722" }}>
       <Toolbar
@@ -36,6 +41,8 @@ export default function App(): JSX.Element {
         onToolSelect={handleToolSelect}
         onClear={handleClear}
         wsConnected={connected}
+        redUp={redUp}
+        onToggleColor={handleToggleColor}
       />
       {error && (
         <div style={{ padding: "8px 16px", background: "#7f1d1d", color: "#fca5a5", fontSize: 13 }}>
@@ -51,6 +58,7 @@ export default function App(): JSX.Element {
           activeTool={activeTool}
           onToolConsumed={handleToolConsumed}
           clearSignal={clearSignal}
+          redUp={redUp}
         />
       </div>
     </div>

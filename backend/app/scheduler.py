@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from . import aggregator, db, finmind_client, twse_client, yahoo_client
+from . import aggregator, db, finmind_client, taifex_client, twse_client, yahoo_client
 from .config import settings
 from .market_time import is_after_close, is_market_open, is_trading_day, now_tw
 from .models import to_ms
@@ -83,6 +83,40 @@ async def job_daily_fetch() -> None:
         db.upsert_daily_margin(margin)
         logger.info("daily_margin upserted: %d rows", len(margin))
 
+    ff = await taifex_client.fetch_foreign_future_oi(today)
+    if ff:
+        db.upsert_daily_foreign_future([ff])
+        logger.info("daily_foreign_future upserted: %s", ff.get("date"))
+
+
+async def backfill_foreign_future_taifex() -> None:
+    """以期交所回填外資台指期貨未平倉口數歷史（每日一次請求，節流）。
+
+    守衛：若與日線相比無缺漏，直接跳過。
+    """
+    rows = db.fetchall_dict(
+        """
+        SELECT k.date
+        FROM daily_kline k
+        LEFT JOIN daily_foreign_future f ON k.date = f.date
+        WHERE f.date IS NULL
+        ORDER BY k.date DESC
+        LIMIT ?
+        """,
+        [settings.taifex_backfill_days],
+    )
+    if not rows:
+        logger.info("foreign future history already complete, skip TAIFEX")
+        return
+    total = 0
+    for r in rows:
+        d = r["date"]
+        ff = await taifex_client.fetch_foreign_future_oi(d)
+        if ff:
+            db.upsert_daily_foreign_future([ff])
+            total += 1
+    logger.info("TAIFEX foreign future backfilled: %d rows", total)
+
 
 def _add_intraday_jobs() -> None:
     """動態加入盤中 interval jobs。"""
@@ -142,6 +176,7 @@ async def job_backfill_check() -> None:
     await backfill_daily_kline_yahoo()
     await backfill_volume_finmind()
     await backfill_margin_finmind()
+    await backfill_foreign_future_taifex()
 
 
 async def backfill_minute_kline() -> None:

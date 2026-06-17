@@ -31,7 +31,15 @@ CREATE TABLE IF NOT EXISTS daily_margin (
     margin_sell BIGINT,
     short_balance BIGINT,
     short_buy BIGINT,
-    short_sell BIGINT
+    short_sell BIGINT,
+    margin_value BIGINT
+);
+
+CREATE TABLE IF NOT EXISTS daily_foreign_future (
+    date DATE PRIMARY KEY,
+    long_oi BIGINT,
+    short_oi BIGINT,
+    net_oi BIGINT
 );
 
 CREATE TABLE IF NOT EXISTS minute_kline (
@@ -60,6 +68,11 @@ def init_db() -> None:
         return
     _conn = duckdb.connect(settings.duckdb_path)
     _conn.execute(SCHEMA_SQL)
+    # 既有 DB 缺欄位時補上
+    try:
+        _conn.execute("ALTER TABLE daily_margin ADD COLUMN IF NOT EXISTS margin_value BIGINT")
+    except duckdb.Error:
+        pass
 
 
 def get_conn() -> duckdb.DuckDBPyConnection:
@@ -146,20 +159,52 @@ def upsert_daily_margin(rows: list[dict[str, Any]]) -> int:
         conn = get_conn()
         conn.executemany(
             """
-            INSERT OR REPLACE INTO daily_margin
+            INSERT INTO daily_margin
                 (date, margin_balance, margin_buy, margin_sell,
-                 short_balance, short_buy, short_sell)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                 short_balance, short_buy, short_sell, margin_value)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(date) DO UPDATE SET
+                margin_balance = COALESCE(excluded.margin_balance, daily_margin.margin_balance),
+                margin_buy     = COALESCE(excluded.margin_buy, daily_margin.margin_buy),
+                margin_sell    = COALESCE(excluded.margin_sell, daily_margin.margin_sell),
+                short_balance  = COALESCE(excluded.short_balance, daily_margin.short_balance),
+                short_buy      = COALESCE(excluded.short_buy, daily_margin.short_buy),
+                short_sell     = COALESCE(excluded.short_sell, daily_margin.short_sell),
+                margin_value   = COALESCE(excluded.margin_value, daily_margin.margin_value)
             """,
             [
                 (
                     r["date"],
-                    int(r.get("margin_balance") or 0),
-                    int(r.get("margin_buy") or 0),
-                    int(r.get("margin_sell") or 0),
-                    int(r.get("short_balance") or 0),
-                    int(r.get("short_buy") or 0),
-                    int(r.get("short_sell") or 0),
+                    int(r.get("margin_balance") or 0) or None,
+                    int(r.get("margin_buy") or 0) or None,
+                    int(r.get("margin_sell") or 0) or None,
+                    int(r.get("short_balance") or 0) or None,
+                    int(r.get("short_buy") or 0) or None,
+                    int(r.get("short_sell") or 0) or None,
+                    int(r.get("margin_value") or 0) or None,
+                )
+                for r in rows
+            ],
+        )
+    return len(rows)
+
+
+def upsert_daily_foreign_future(rows: list[dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    with _lock:
+        conn = get_conn()
+        conn.executemany(
+            """
+            INSERT OR REPLACE INTO daily_foreign_future (date, long_oi, short_oi, net_oi)
+            VALUES (?, ?, ?, ?)
+            """,
+            [
+                (
+                    r["date"],
+                    int(r.get("long_oi") or 0),
+                    int(r.get("short_oi") or 0),
+                    int(r.get("net_oi") or 0),
                 )
                 for r in rows
             ],
@@ -222,15 +267,21 @@ def get_merged_daily(start: date | None = None, end: date | None = None) -> list
                COALESCE(m.margin_sell, lm.margin_sell) AS margin_sell,
                COALESCE(m.short_balance, lm.short_balance) AS short_balance,
                COALESCE(m.short_buy, lm.short_buy) AS short_buy,
-               COALESCE(m.short_sell, lm.short_sell) AS short_sell
+               COALESCE(m.short_sell, lm.short_sell) AS short_sell,
+               COALESCE(m.margin_value, lmv.margin_value) AS margin_value,
+               f.long_oi, f.short_oi, f.net_oi
         FROM daily_kline k
         LEFT JOIN daily_volume v ON k.date = v.date
         LEFT JOIN daily_margin m ON k.date = m.date
+        LEFT JOIN daily_foreign_future f ON k.date = f.date
         LEFT JOIN (
             SELECT margin_balance, margin_buy, margin_sell,
                    short_balance, short_buy, short_sell
-            FROM daily_margin ORDER BY date DESC LIMIT 1
+            FROM daily_margin WHERE margin_balance IS NOT NULL ORDER BY date DESC LIMIT 1
         ) lm ON TRUE
+        LEFT JOIN (
+            SELECT margin_value FROM daily_margin WHERE margin_value IS NOT NULL ORDER BY date DESC LIMIT 1
+        ) lmv ON TRUE
     """
     params: list[Any] = []
     clauses: list[str] = []

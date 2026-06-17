@@ -24,7 +24,35 @@ async def throttled_get_json(
     max_retries: int = 4,
     timeout: float | None = None,
 ) -> Any:
-    """節流 + 指數退避的 GET，回傳 JSON。
+    return await _request(url, params=params, headers=headers, as_json=True,
+                          min_interval=min_interval, max_retries=max_retries, timeout=timeout)
+
+
+async def throttled_post_text(
+    url: str,
+    form: dict[str, str] | None = None,
+    *,
+    headers: dict[str, str] | None = None,
+    min_interval: float | None = None,
+    max_retries: int = 4,
+    timeout: float | None = None,
+) -> str:
+    return await _request(url, form=form, headers=headers, as_json=False,
+                          min_interval=min_interval, max_retries=max_retries, timeout=timeout)
+
+
+async def _request(
+    url: str,
+    *,
+    params: dict[str, str] | None = None,
+    form: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
+    as_json: bool = True,
+    min_interval: float | None = None,
+    max_retries: int = 4,
+    timeout: float | None = None,
+) -> Any:
+    """節流 + 指數退避的請求（GET 取 JSON／POST form 取文字）。
 
     - 以 host 為單位強制最小請求間隔（預設 settings.http_min_interval_sec）。
     - 遇 429 / 503 或網路例外時指數退避重試。
@@ -45,11 +73,14 @@ async def throttled_get_json(
                 async with httpx.AsyncClient(
                     timeout=to, headers=headers, follow_redirects=True
                 ) as client:
-                    resp = await client.get(url, params=params)
+                    if form is not None:
+                        resp = await client.post(url, data=form)
+                    else:
+                        resp = await client.get(url, params=params)
                     if resp.status_code in (429, 503):
                         wait = min(2 ** attempt, 30)
                         logger.warning(
-                            "throttled_get %s status %s, backoff %.1fs",
+                            "throttled_request %s status %s, backoff %.1fs",
                             host,
                             resp.status_code,
                             wait,
@@ -58,11 +89,11 @@ async def throttled_get_json(
                         continue
                     resp.raise_for_status()
                     _last[host] = time.monotonic()
-                    return resp.json()
+                    return resp.json() if as_json else resp.text
             except httpx.HTTPError as exc:
                 last_exc = exc
                 wait = min(2 ** attempt, 30)
-                logger.warning("throttled_get %s error %s, retry in %.1fs", host, exc, wait)
+                logger.warning("throttled_request %s error %s, retry in %.1fs", host, exc, wait)
                 await asyncio.sleep(wait)
 
         _last[host] = time.monotonic()

@@ -21,6 +21,10 @@ class DailyBar(BaseModel):
     short_balance: int | None = None
     short_buy: int | None = None
     short_sell: int | None = None
+    margin_value: int | None = None
+    long_oi: int | None = None
+    short_oi: int | None = None
+    net_oi: int | None = None
 
 
 class MinuteBar(BaseModel):
@@ -75,6 +79,10 @@ def dict_to_daily_bar(row: dict[str, Any]) -> DailyBar:
         short_balance=row.get("short_balance"),
         short_buy=row.get("short_buy"),
         short_sell=row.get("short_sell"),
+        margin_value=row.get("margin_value"),
+        long_oi=row.get("long_oi"),
+        short_oi=row.get("short_oi"),
+        net_oi=row.get("net_oi"),
     )
 
 

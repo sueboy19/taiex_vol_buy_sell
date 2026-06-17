@@ -107,6 +107,7 @@ async def fetch_market_margin(
                 "short_balance": 0,
                 "short_buy": 0,
                 "short_sell": 0,
+                "margin_value": 0,
             },
         )
         name = r.get("name")
@@ -118,5 +119,8 @@ async def fetch_market_margin(
             entry["short_balance"] = int(r.get("TodayBalance") or 0)
             entry["short_buy"] = int(r.get("buy") or 0)
             entry["short_sell"] = int(r.get("sell") or 0)
+        elif name == "MarginPurchaseMoney":
+            # 融資金額（元）
+            entry["margin_value"] = int(r.get("TodayBalance") or 0)
 
     return [pivoted[k] for k in sorted(pivoted)]
