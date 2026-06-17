@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from . import aggregator, db, twse_client, yahoo_client
+from . import aggregator, db, finmind_client, twse_client, yahoo_client
 from .config import settings
 from .market_time import is_after_close, is_market_open, is_trading_day, now_tw
 from .models import to_ms
@@ -139,6 +139,9 @@ async def job_backfill_check() -> None:
             logger.info("backfill detected gap, fetching daily data...")
             await job_daily_fetch()
     await backfill_minute_kline()
+    await backfill_daily_kline_yahoo()
+    await backfill_volume_finmind()
+    await backfill_margin_finmind()
 
 
 async def backfill_minute_kline() -> None:
@@ -149,6 +152,77 @@ async def backfill_minute_kline() -> None:
     if bars:
         db.upsert_minute_kline(bars)
         logger.info("minute_kline backfilled: %d rows", len(bars))
+
+
+async def backfill_daily_kline_yahoo() -> None:
+    """以 Yahoo 回填日線歷史（一次抓 5 年）。
+
+    守衛：若 daily_kline 最早日期已早於一年前，代表歷史足夠，直接跳過。
+    """
+    earliest = db.get_earliest_daily_date()
+    threshold = date.today() - timedelta(days=365)
+    if earliest is not None and earliest <= threshold:
+        logger.info("daily kline history sufficient (earliest=%s), skip Yahoo", earliest)
+        return
+    bars = await yahoo_client.fetch_daily_kline_yahoo("5y")
+    if bars:
+        db.upsert_daily_kline(bars)
+        logger.info("Yahoo daily kline backfilled: %d rows (earliest now %s)", len(bars), bars[0]["date"])
+
+
+async def backfill_volume_finmind() -> None:
+    """以 FinMind（TAIEX）回填大盤成交量歷史。
+
+    守衛：若 daily_kline 的日期皆已有成交量，直接跳過（不呼叫 FinMind）。
+    TAIEX 為單列/日，無 500 列截斷問題，可一次抓整段。
+    """
+    missing = db.get_missing_volume_dates()
+    if not missing:
+        logger.info("volume history already complete, skip FinMind")
+        return
+    start, end = min(missing), max(missing)
+    rows = await finmind_client.fetch_market_volume(start, end)
+    if rows:
+        db.upsert_daily_volume(rows)
+        logger.info(
+            "FinMind volume backfilled: %d rows (%s ~ %s)", len(rows), start, end
+        )
+    else:
+        logger.warning("FinMind volume backfill returned no rows for %s ~ %s", start, end)
+
+
+async def backfill_margin_finmind() -> None:
+    """以 FinMind 回填全市場融資融券歷史（分段避開單次 500 列上限）。
+
+    守衛：若 daily_kline 的日期皆已有融資融券，直接跳過（不呼叫 FinMind）。
+    只抓「含有缺失日期」的區段，已完整的區段不重複請求。
+    """
+    missing = db.get_missing_margin_dates(limit=10000)
+    if not missing:
+        logger.info("margin history already complete, skip FinMind")
+        return
+    missing_set = set(missing)
+    start_all, end_all = min(missing), max(missing)
+
+    chunk_days = 150  # 每段約 150 日 × 3 名稱 ≈ 450 列 < FinMind 500 列上限
+    total = 0
+    cur = start_all
+    while cur <= end_all:
+        seg_end = min(cur + timedelta(days=chunk_days - 1), end_all)
+        # 此區段含有缺失日期才抓
+        has_gap = any(
+            cur + timedelta(days=i) in missing_set
+            for i in range((seg_end - cur).days + 1)
+        )
+        if has_gap:
+            rows = await finmind_client.fetch_market_margin(cur, seg_end)
+            if rows:
+                db.upsert_daily_margin(rows)
+                total += len(rows)
+        cur = seg_end + timedelta(days=1)
+    logger.info(
+        "FinMind margin backfill done: %d rows (%s ~ %s)", total, start_all, end_all
+    )
 
 
 def start_scheduler() -> None:

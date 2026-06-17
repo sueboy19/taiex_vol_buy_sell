@@ -17,13 +17,16 @@ export function setupChartExtensions(): void {
         shortBalance: -((d.short_balance as number) ?? 0),
       })),
     figures: [
-      { key: "marginBalance", title: "融資: ", type: "bar" },
-      { key: "shortBalance", title: "融券: ", type: "bar" },
+      { key: "marginBalance", title: "融資: ", type: "bar", baseValue: 0 },
+      { key: "shortBalance", title: "融券: ", type: "bar", baseValue: 0 },
     ],
+    // klinecharts 的 bar 顏色取自 styles.bars[i].noChangeColor（依 figure 順序）
     styles: {
-      marginBalance: { color: "#ef5350" },
-      shortBalance: { color: "#26a69a" },
-    },
+      bars: [
+        { noChangeColor: "#ef5350" },
+        { noChangeColor: "#26a69a" },
+      ],
+    } as never,
   } as never);
 
   registerOverlay({

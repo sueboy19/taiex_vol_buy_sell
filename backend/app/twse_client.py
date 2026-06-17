@@ -4,8 +4,7 @@ import logging
 from datetime import date, datetime
 from typing import Any
 
-import httpx
-
+from . import http_util
 from .config import settings
 
 logger = logging.getLogger(__name__)
@@ -17,12 +16,7 @@ _HEADERS = {
 
 
 async def _get_json(url: str, params: dict[str, str] | None = None) -> Any:
-    async with httpx.AsyncClient(
-        timeout=settings.http_timeout_sec, headers=_HEADERS, follow_redirects=True
-    ) as client:
-        resp = await client.get(url, params=params)
-        resp.raise_for_status()
-        return resp.json()
+    return await http_util.throttled_get_json(url, params, headers=_HEADERS)
 
 
 def _today_str() -> str:

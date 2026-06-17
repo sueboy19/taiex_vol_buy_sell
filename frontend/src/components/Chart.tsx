@@ -100,6 +100,7 @@ export function Chart({
       indicator: {
         lastValueMark: { show: false },
       },
+      grid: { show: false },
     } as never);
 
     chart.createIndicator("VOL", false, { id: "vol_pane", height: 120, dragEnabled: true } as never);

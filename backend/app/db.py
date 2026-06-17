@@ -276,6 +276,43 @@ def get_latest_daily_date() -> date | None:
     return rows[0][0] if rows and rows[0][0] else None
 
 
+def get_earliest_daily_date() -> date | None:
+    rows = fetchall("SELECT MIN(date) FROM daily_kline")
+    return rows[0][0] if rows and rows[0][0] else None
+
+
+def get_missing_margin_dates(limit: int = 500) -> list[date]:
+    """回傳 daily_kline 中尚未有融資融券資料的日期（最近的優先）。"""
+    rows = fetchall_dict(
+        """
+        SELECT k.date
+        FROM daily_kline k
+        LEFT JOIN daily_margin m ON k.date = m.date
+        WHERE m.date IS NULL
+        ORDER BY k.date DESC
+        LIMIT ?
+        """,
+        [limit],
+    )
+    return [r["date"] for r in rows]
+
+
+def get_missing_volume_dates(limit: int = 5000) -> list[date]:
+    """回傳 daily_kline 中尚未有成交量資料的日期（最近的優先）。"""
+    rows = fetchall_dict(
+        """
+        SELECT k.date
+        FROM daily_kline k
+        LEFT JOIN daily_volume v ON k.date = v.date
+        WHERE v.date IS NULL
+        ORDER BY k.date DESC
+        LIMIT ?
+        """,
+        [limit],
+    )
+    return [r["date"] for r in rows]
+
+
 def get_latest_minute_ts() -> datetime | None:
     rows = fetchall("SELECT MAX(ts) FROM minute_kline")
     return rows[0][0] if rows and rows[0][0] else None
