@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -17,6 +17,21 @@ _scheduler: AsyncIOScheduler | None = None
 _tz = ZoneInfo(settings.tz_name)
 
 INTRADAY_JOBS = ("intraday_index", "intraday_volume")
+
+
+def _parse_times(spec: str) -> list[time]:
+    """解析 'HH:MM,HH:MM' 字串為 time 清單，忽略空白與無效項。"""
+    out: list[time] = []
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            h, m = part.split(":")
+            out.append(time(int(h), int(m)))
+        except ValueError:
+            logger.warning("invalid daily_fetch_retry_times entry: %r", part)
+    return out
 
 
 async def job_intraday_index() -> None:
@@ -72,6 +87,19 @@ async def job_daily_fetch() -> None:
     if kline:
         db.upsert_daily_kline(kline)
         logger.info("daily_kline upserted: %d rows", len(kline))
+
+    # TWSE 的 MI_5MINS_HIST 當日日線常滯後（盤後批次、甚至次日才公布）。
+    # 若今日那根仍缺，用 Yahoo（收盤後即有當日 OHLC）補上，讓當日圖表看得到。
+    if db.get_latest_daily_date() is None or db.get_latest_daily_date() < today:
+        bars = await yahoo_client.fetch_daily_kline_yahoo("5d")
+        today_bar = next((b for b in bars if b["date"] == today), None)
+        if today_bar:
+            db.upsert_daily_kline([today_bar])
+            logger.info(
+                "daily_kline (Yahoo fallback) filled for %s close=%s",
+                today,
+                today_bar["close"],
+            )
 
     vol = await twse_client.fetch_daily_volume(today)
     if vol:
@@ -295,6 +323,17 @@ def start_scheduler() -> None:
         day_of_week="mon-fri",
         id="daily_fetch",
     )
+    # 晚間重試：TWSE 日線/成交量盤後才陸續公布，13:35 常抓不到當日。
+    # job_daily_fetch 為 INSERT OR REPLACE（冪等），多次執行安全。
+    for i, hhmm in enumerate(_parse_times(settings.daily_fetch_retry_times)):
+        _scheduler.add_job(
+            job_daily_fetch,
+            "cron",
+            hour=hhmm.hour,
+            minute=hhmm.minute,
+            day_of_week="mon-fri",
+            id=f"daily_fetch_retry_{i}",
+        )
     # 啟動時檢查當前狀態
     _scheduler.add_job(
         job_backfill_check,

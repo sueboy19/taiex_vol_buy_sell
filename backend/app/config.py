@@ -27,6 +27,8 @@ class Settings(BaseSettings):
 
     daily_fetch_hour: int = 13
     daily_fetch_minute: int = 35
+    # 收盤後 TWSE 日線/量通常晚間才公布，13:35 抓不到；這些時間再重試（冪等 upsert）。
+    daily_fetch_retry_times: str = "19:00,20:30,22:00"
 
     http_timeout_sec: float = 15.0
     http_min_interval_sec: float = 3.0
