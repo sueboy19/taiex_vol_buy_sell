@@ -4,10 +4,11 @@ import { Chart } from "./components/Chart";
 import { Toolbar } from "./components/Toolbar";
 import { useKlineData } from "./hooks/useKlineData";
 import { useRealtime } from "./hooks/useRealtime";
+import { isMarketOpen } from "./lib/marketTime";
 import type { Period } from "./types";
 
 export default function App(): JSX.Element {
-  const [period, setPeriod] = useState<Period>("day");
+  const [period, setPeriod] = useState<Period>(() => (isMarketOpen() ? "minute" : "day"));
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [clearSignal, setClearSignal] = useState(0);
   const [redUp, setRedUp] = useState(true);
