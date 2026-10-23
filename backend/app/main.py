@@ -34,13 +34,25 @@ def _cors_origins() -> list[str]:
     return [o.strip() for o in settings.cors_origins.split(",") if o.strip()] or ["*"]
 
 
-def origin_allowed(origin: str | None) -> bool:
-    """WebSocket / CORS 共用的來源白名單檢查；"*" 時放行（唯讀公開資料）。"""
+def origin_allowed(origin: str | None, host: str | None = None) -> bool:
+    """WebSocket 的來源檢查；"*" 時放行（唯讀公開資料）。
+
+    同源（前端與 WS 同一站台、經 nginx/Cloudflare/Traefik 同域代理）一律放行，
+    跨站則需符合白名單——可相容 CORS_ORIGINS 與實際網域格式不一致的情況
+    （如帶 www、port 或路徑差異）。
+    """
     origins = _cors_origins()
     if "*" in origins:
         return True
     # 限制明確白名單時，缺少 Origin（非瀏覽器客戶端）一律拒絕
-    return origin is not None and origin.rstrip("/") in [o.rstrip("/") for o in origins]
+    if origin is None:
+        return False
+    origin = origin.rstrip("/")
+    if origin in [o.rstrip("/") for o in origins]:
+        return True
+    origin_host = origin.split("://", 1)[-1].lower()
+    req_host = (host or "").split(":", 1)[0].lower()
+    return bool(origin_host) and bool(req_host) and origin_host == req_host
 
 
 app.add_middleware(
@@ -68,7 +80,7 @@ async def ws_realtime(ws: WebSocket):
     if settings.ws_max_connections and manager.count() >= settings.ws_max_connections:
         await ws.close(code=1013)  # Try Again Later
         return
-    if not origin_allowed(ws.headers.get("origin")):
+    if not origin_allowed(ws.headers.get("origin"), ws.headers.get("host")):
         await ws.close(code=1008)  # Policy Violation
         return
     await manager.connect(ws)

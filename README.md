@@ -72,8 +72,8 @@ docker compose -f docker-compose.dev.yml up --build
 #### 資安設計
 
 - API 為公開唯讀（GET only）；`CORS_ORIGINS=*` 時自動停用 credentials
-- WebSocket 驗證 Origin 白名單並限制連線數（防跨站 WS 劫持與資源耗盡）
-- nginx 提供 `limit_req`（API 10 r/s / IP）與 `limit_conn`（WS 5 條 / IP）、安全標頭（CSP / nosniff / frame-ancestors）
+- WebSocket 允許同源連線（本站前端）；跨站需符合 Origin 白名單，並限制連線數（防跨站 WS 劫持與資源耗盡）
+- nginx 限流以 `X-Forwarded-For` 為鍵（站點位於 Cloudflare/Traefik 之後，`$remote_addr` 為代理 IP）：API 20 r/s、WS 10 條連線 / 客戶端；並提供安全標頭（CSP / nosniff / frame-ancestors）
 - 後端容器以非 root（appuser）執行；frontend 僅保留 nginx 最小權限（cap_drop ALL + 最小 cap_add）
 - Python 相依套件已鎖定版本（`backend/requirements.txt`）
 - CA 事件（如 2026-10 eMudhra/emSign 中繼 CA 私鑰外洩）：更新 `requirements.txt` 中的
