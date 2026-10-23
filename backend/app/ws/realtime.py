@@ -23,6 +23,9 @@ class ConnectionManager:
             self.active.remove(ws)
         logger.info("WS client disconnected, total: %d", len(self.active))
 
+    def count(self) -> int:
+        return len(self.active)
+
     async def broadcast(self, data: dict[str, Any]) -> None:
         text = json.dumps(data, default=str)
         dead: list[WebSocket] = []

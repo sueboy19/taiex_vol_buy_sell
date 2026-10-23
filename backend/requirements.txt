@@ -1,7 +1,15 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.32.0
-httpx>=0.27.0
-duckdb>=1.1.0
-apscheduler>=3.10.0,<4.0.0
-pydantic>=2.9.0
-pydantic-settings>=2.5.0
+# 已鎖定版本（2026-10 查證 PyPI 最新穩定版），避免建置時自動抓到未預期的新版
+# 升級時請逐項驗證後再改；duckdb 維持 1.x 以確保既有 DB 檔案相容
+#
+# certifi：CA 憑證 bundle。eMudhra/emSign 中繼 CA 私鑰外洩事件（2026-10），
+# 2026.10.19 起移除受影響的 root。httpx 的 HTTPS 驗證預設使用 certifi，
+# 此為傳遞性相依，Docker layer cache 會凍結舊版 —— CA 事件後務必改此版本號
+# 觸發 layer 重建（或 build 時清除 cache）。
+certifi==2026.10.19
+fastapi==0.161.1
+uvicorn[standard]==0.54.0
+httpx==0.28.1
+duckdb==1.5.6
+apscheduler==3.11.3
+pydantic==2.14.1
+pydantic-settings==2.16.1

@@ -7,9 +7,16 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    # 入口以 root 修正 /data 擁有權後即降權為 appuser（見 backend/entrypoint.sh）
+    security_opt:
+      - no-new-privileges:true
     environment:
       - DUCKDB_PATH=/data/taiex.duckdb
+      # Coolify 依 frontend service 指派的網域自動產生（含 scheme，如 https://taiex.mkinweb.com）
       - CORS_ORIGINS=${SERVICE_URL_FRONTEND}
+      # 可在 Coolify 環境變數 UI 設定（選填）
+      - FINMIND_TOKEN=${FINMIND_TOKEN:-}
+      - WS_MAX_CONNECTIONS=${WS_MAX_CONNECTIONS:-200}
     volumes:
       - type: volume
         source: db-data
@@ -31,6 +38,17 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    # nginx master 需 root 綁 port 80 與切換 worker 身分；僅保留最小權限
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
     environment:
       - SERVICE_URL_FRONTEND_80
     depends_on:

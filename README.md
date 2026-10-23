@@ -56,6 +56,30 @@ docker compose -f docker-compose.dev.yml up --build
 4. 在 Coolify UI 為 `frontend` service 指派網域
 5. 部署
 
+#### Coolify 環境變數
+
+在 Coolify 專案的 **Environment variables** 頁面設定（並勾選可用於 build/deploy）：
+
+| 變數 | 必填 | 說明 |
+|------|------|------|
+| `SERVICE_URL_FRONTEND` | 自動 | Coolify 依 frontend 指派的網域**自動產生**（如 `https://taiex.mkinweb.com`），compose 檔用它帶入 `CORS_ORIGINS`，不需手動設 |
+| `FINMIND_TOKEN` | 否 | FinMind API token，提升資料回填額度 |
+| `WS_MAX_CONNECTIONS` | 否 | WebSocket 連線數上限，預設 200 |
+
+注意：CORS 是否正確收緊，取決於 **frontend service 有在 Coolify 指派網域**（產生 `SERVICE_URL_FRONTEND`）。
+若想明確固定，也可直接在 Coolify 加一組 `CORS_ORIGINS=https://taiex.mkinweb.com` 覆蓋。
+
+#### 資安設計
+
+- API 為公開唯讀（GET only）；`CORS_ORIGINS=*` 時自動停用 credentials
+- WebSocket 驗證 Origin 白名單並限制連線數（防跨站 WS 劫持與資源耗盡）
+- nginx 提供 `limit_req`（API 10 r/s / IP）與 `limit_conn`（WS 5 條 / IP）、安全標頭（CSP / nosniff / frame-ancestors）
+- 後端容器以非 root（appuser）執行；frontend 僅保留 nginx 最小權限（cap_drop ALL + 最小 cap_add）
+- Python 相依套件已鎖定版本（`backend/requirements.txt`）
+- CA 事件（如 2026-10 eMudhra/emSign 中繼 CA 私鑰外洩）：更新 `requirements.txt` 中的
+  `certifi` 版本號即可觸發 Docker layer 重建（一般 Redeploy 即可，不必清 cache）；
+  build 時並先升級 pip 以修補其內建信任庫
+
 ## 專案結構
 
 ```

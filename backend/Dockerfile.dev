@@ -2,6 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# 同 Dockerfile：先升級 pip（修補 vendored CA bundle）再安裝相依
+RUN pip install --no-cache-dir --upgrade pip==26.2.2
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

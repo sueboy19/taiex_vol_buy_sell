@@ -1,0 +1,5 @@
+# Windows 編輯器容易寫入 CRLF，確保 shell script 與設定檔在容器內為 LF
+*.sh text eol=lf
+Dockerfile* text eol=lf
+*.conf text eol=lf
+*.yml text eol=lf

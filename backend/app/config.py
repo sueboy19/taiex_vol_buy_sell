@@ -34,7 +34,12 @@ class Settings(BaseSettings):
     http_min_interval_sec: float = 3.0
     taifex_backfill_days: int = 90
 
+    # 允許跨源的來源（逗號分隔，含 scheme，例如 https://taiex.mkinweb.com）。
+    # "*" 時為公開唯讀 API：自動停用 credentials（瀏覽器規範不允許 * + credentials）。
     cors_origins: str = "*"
+
+    # WebSocket 連線數上限（防資源耗盡）；0 = 不限制
+    ws_max_connections: int = 200
 
 
 settings = Settings()

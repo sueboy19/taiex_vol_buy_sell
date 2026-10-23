@@ -14,10 +14,12 @@ router = APIRouter(prefix="/api", tags=["kline"])
 async def get_kline(
     period: str = Query("day", pattern="^(day|minute)$"),
     date: date | None = Query(None, alias="date"),
+    start: date | None = Query(None),
+    end: date | None = Query(None),
 ):
     if period == "minute":
         rows = db.get_minute_kline(day=date)
         return {"period": "minute", "bars": [dict_to_minute_bar(r).model_dump() for r in rows]}
     else:
-        rows = db.get_merged_daily()
+        rows = db.get_merged_daily(start=start, end=end)
         return {"period": "day", "bars": [dict_to_daily_bar(r).model_dump() for r in rows]}
