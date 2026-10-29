@@ -378,13 +378,18 @@ def get_earliest_daily_date() -> date | None:
 
 
 def get_missing_margin_dates(limit: int = 500) -> list[date]:
-    """回傳 daily_kline 中尚未有融資融券資料的日期（最近的優先）。"""
+    """回傳 daily_kline 中缺融資融券資料的日期（最近的優先）。
+
+    缺定義：完全沒有 daily_margin 列，或該列缺 margin_value（融資市值）。
+    margin_value 僅 FinMind 提供（TWSE MI_MARGN 無此欄位），若只檢查列存在，
+    每日 TWSE 寫入後守衛永遠跳過，市值會凍結在最後一次 FinMind 回填日。
+    """
     rows = fetchall_dict(
         """
         SELECT k.date
         FROM daily_kline k
         LEFT JOIN daily_margin m ON k.date = m.date
-        WHERE m.date IS NULL
+        WHERE m.date IS NULL OR m.margin_value IS NULL
         ORDER BY k.date DESC
         LIMIT ?
         """,
