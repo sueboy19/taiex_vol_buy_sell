@@ -42,6 +42,16 @@ CREATE TABLE IF NOT EXISTS daily_foreign_future (
     net_oi BIGINT
 );
 
+CREATE TABLE IF NOT EXISTS daily_pcr (
+    date DATE PRIMARY KEY,
+    call_vol BIGINT,
+    put_vol BIGINT,
+    pcr_vol DOUBLE,
+    call_oi BIGINT,
+    put_oi BIGINT,
+    pcr_oi DOUBLE
+);
+
 CREATE TABLE IF NOT EXISTS minute_kline (
     ts TIMESTAMP PRIMARY KEY,
     open DOUBLE,
@@ -212,6 +222,39 @@ def upsert_daily_foreign_future(rows: list[dict[str, Any]]) -> int:
     return len(rows)
 
 
+def upsert_daily_pcr(rows: list[dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    with _lock:
+        conn = get_conn()
+        conn.executemany(
+            """
+            INSERT INTO daily_pcr (date, call_vol, put_vol, pcr_vol, call_oi, put_oi, pcr_oi)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(date) DO UPDATE SET
+                call_vol = COALESCE(excluded.call_vol, daily_pcr.call_vol),
+                put_vol  = COALESCE(excluded.put_vol, daily_pcr.put_vol),
+                pcr_vol  = COALESCE(excluded.pcr_vol, daily_pcr.pcr_vol),
+                call_oi  = COALESCE(excluded.call_oi, daily_pcr.call_oi),
+                put_oi   = COALESCE(excluded.put_oi, daily_pcr.put_oi),
+                pcr_oi   = COALESCE(excluded.pcr_oi, daily_pcr.pcr_oi)
+            """,
+            [
+                (
+                    r["date"],
+                    int(r.get("call_vol") or 0) or None,
+                    int(r.get("put_vol") or 0) or None,
+                    float(r["pcr_vol"]) if r.get("pcr_vol") is not None else None,
+                    int(r.get("call_oi") or 0) or None,
+                    int(r.get("put_oi") or 0) or None,
+                    float(r["pcr_oi"]) if r.get("pcr_oi") is not None else None,
+                )
+                for r in rows
+            ],
+        )
+    return len(rows)
+
+
 def upsert_minute_kline(rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
@@ -269,11 +312,13 @@ def get_merged_daily(start: date | None = None, end: date | None = None) -> list
                COALESCE(m.short_buy, lm.short_buy) AS short_buy,
                COALESCE(m.short_sell, lm.short_sell) AS short_sell,
                COALESCE(m.margin_value, lmv.margin_value) AS margin_value,
-               f.long_oi, f.short_oi, f.net_oi
+               f.long_oi, f.short_oi, f.net_oi,
+               p.call_vol, p.put_vol, p.pcr_vol, p.call_oi, p.put_oi, p.pcr_oi
         FROM daily_kline k
         LEFT JOIN daily_volume v ON k.date = v.date
         LEFT JOIN daily_margin m ON k.date = m.date
         LEFT JOIN daily_foreign_future f ON k.date = f.date
+        LEFT JOIN daily_pcr p ON k.date = p.date
         LEFT JOIN (
             SELECT margin_balance, margin_buy, margin_sell,
                    short_balance, short_buy, short_sell
@@ -340,6 +385,22 @@ def get_missing_margin_dates(limit: int = 500) -> list[date]:
         FROM daily_kline k
         LEFT JOIN daily_margin m ON k.date = m.date
         WHERE m.date IS NULL
+        ORDER BY k.date DESC
+        LIMIT ?
+        """,
+        [limit],
+    )
+    return [r["date"] for r in rows]
+
+
+def get_missing_pcr_dates(limit: int = 5000) -> list[date]:
+    """回傳 daily_kline 中尚未有買賣權比資料的日期（最近的優先）。"""
+    rows = fetchall_dict(
+        """
+        SELECT k.date
+        FROM daily_kline k
+        LEFT JOIN daily_pcr p ON k.date = p.date
+        WHERE p.date IS NULL
         ORDER BY k.date DESC
         LIMIT ?
         """,

@@ -12,6 +12,7 @@
 - **K線圖**（日線 / 分鐘線）— KLineChart
 - **成交量**副圖
 - **融資 / 融券**副圖（每日，證交所資料）
+- **買賣權 P/C 比**副圖（臺指選擇權 TXO：成交量比＋未平倉比，附 1.0 基準線；P/C 升高代表賣權交易／避險需求升溫，可搭配外資期貨部位觀察主力反向風險對沖）
 - **盤中即時**更新（開盤 09:00-13:30，WebSocket 推播分鐘K）
 - **畫線工具**：線段、射線、水平線、畫筆（自由手繪）、箭頭
   - 畫線儲存於瀏覽器 localStorage
@@ -34,6 +35,7 @@
 | 日線 OHLC | TWSE OpenAPI `/indicesReport/MI_5MINS_HIST` | 收盤後 |
 | 日成交量 | TWSE OpenAPI `/exchangeReport/FMTQIK` | 收盤後 |
 | 融資融券 | TWSE OpenAPI `/exchangeReport/MI_MARGN`（全市場合計） | 收盤後 |
+| 買賣權 P/C 比 | TAIFEX `/cht/3/dlPcRatioDown` CSV（臺指選擇權 TXO，區間≤30日） | 收盤後 |
 | 盤中分鐘K指數 | Yahoo Finance v8 `^TWII` | 盤中每 30s |
 | 盤中分鐘量 | TWSE OpenAPI `/exchangeReport/MI_5MINS`（5秒累計差值） | 盤中每 10s |
 

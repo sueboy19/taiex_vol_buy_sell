@@ -116,6 +116,14 @@ async def job_daily_fetch() -> None:
         db.upsert_daily_foreign_future([ff])
         logger.info("daily_foreign_future upserted: %s", ff.get("date"))
 
+    # 買賣權 Put/Call 比：抓近 7 日（冪等 upsert，可自動補齊前幾日漏抓）
+    pcr = await taifex_client.fetch_put_call_ratio(
+        today - timedelta(days=6), today
+    )
+    if pcr:
+        db.upsert_daily_pcr(pcr)
+        logger.info("daily_pcr upserted: %d rows", len(pcr))
+
 
 async def backfill_foreign_future_taifex() -> None:
     """以期交所回填外資台指期貨未平倉口數歷史（每日一次請求，節流）。
@@ -144,6 +152,38 @@ async def backfill_foreign_future_taifex() -> None:
             db.upsert_daily_foreign_future([ff])
             total += 1
     logger.info("TAIFEX foreign future backfilled: %d rows", total)
+
+
+async def backfill_pcr_taifex() -> None:
+    """以期交所 CSV 回填臺指選擇權 Put/Call 比歷史。
+
+    守衛：若與日線相比無缺漏，直接跳過；區間超過 30 日時自動分段（期交所限制）。
+    """
+    missing = db.get_missing_pcr_dates(limit=settings.pcr_backfill_days)
+    if not missing:
+        logger.info("pcr history already complete, skip TAIFEX")
+        return
+    missing_set = set(missing)
+    start_all, end_all = min(missing), max(missing)
+
+    chunk_days = 30  # 期交所限制：查詢區間不可超過 30 日
+    total = 0
+    cur = start_all
+    while cur <= end_all:
+        seg_end = min(cur + timedelta(days=chunk_days - 1), end_all)
+        has_gap = any(
+            cur + timedelta(days=i) in missing_set
+            for i in range((seg_end - cur).days + 1)
+        )
+        if has_gap:
+            rows = await taifex_client.fetch_put_call_ratio(cur, seg_end)
+            if rows:
+                db.upsert_daily_pcr(rows)
+                total += len(rows)
+        cur = seg_end + timedelta(days=1)
+    logger.info(
+        "TAIFEX pcr backfilled: %d rows (%s ~ %s)", total, start_all, end_all
+    )
 
 
 def _add_intraday_jobs() -> None:
@@ -205,6 +245,7 @@ async def job_backfill_check() -> None:
     await backfill_volume_finmind()
     await backfill_margin_finmind()
     await backfill_foreign_future_taifex()
+    await backfill_pcr_taifex()
 
 
 async def backfill_minute_kline() -> None:

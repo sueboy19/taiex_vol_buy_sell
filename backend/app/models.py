@@ -25,6 +25,12 @@ class DailyBar(BaseModel):
     long_oi: int | None = None
     short_oi: int | None = None
     net_oi: int | None = None
+    call_vol: int | None = None
+    put_vol: int | None = None
+    pcr_vol: float | None = None
+    call_oi: int | None = None
+    put_oi: int | None = None
+    pcr_oi: float | None = None
 
 
 class MinuteBar(BaseModel):
@@ -83,6 +89,12 @@ def dict_to_daily_bar(row: dict[str, Any]) -> DailyBar:
         long_oi=row.get("long_oi"),
         short_oi=row.get("short_oi"),
         net_oi=row.get("net_oi"),
+        call_vol=row.get("call_vol"),
+        put_vol=row.get("put_vol"),
+        pcr_vol=row.get("pcr_vol"),
+        call_oi=row.get("call_oi"),
+        put_oi=row.get("put_oi"),
+        pcr_oi=row.get("pcr_oi"),
     )
 
 

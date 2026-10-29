@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import csv
+import io
 import logging
 import re
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from . import http_util
@@ -17,6 +19,13 @@ _HEADERS = {
 
 _URL = f"{settings.taifex_base}/cht/3/futContractsDate"
 _ROLES = {"自營商", "投信", "外資", "外資及陸資", "陸資"}
+
+_PCR_URL = f"{settings.taifex_base}/cht/3/dlPcRatioDown"
+_PCR_HEADERS = {
+    "User-Agent": _HEADERS["User-Agent"],
+    "Accept": "*/*",
+    "Referer": f"{settings.taifex_base}/cht/3/dlPcRatio",
+}
 
 
 def _cells(tr: str) -> list[str]:
@@ -78,3 +87,57 @@ async def fetch_foreign_future_oi(target_date: date) -> dict[str, Any] | None:
     if parsed is None:
         return None
     return {"date": target_date, **parsed}
+
+
+def _parse_pcr_csv(text: str) -> list[dict[str, Any]]:
+    """解析期交所「臺指選擇權 Put/Call 比」CSV（Big5/MS950 由 httpx 依 header 解碼）。
+
+    欄位：日期,賣權成交量,買權成交量,買賣權成交量比率%,賣權未平倉量,買權未平倉量,買賣權未平倉量比率%
+    比率以原始成交量/未平倉量重算（比取整後的百分比更精確）。
+    """
+    out: list[dict[str, Any]] = []
+    reader = csv.DictReader(io.StringIO(text))
+    for row in reader:
+        raw_date = (row.get("日期") or "").strip()
+        if not raw_date:
+            continue
+        try:
+            d = datetime.strptime(raw_date, "%Y/%m/%d").date()
+            call_vol = int((row.get("買權成交量") or "0").replace(",", ""))
+            put_vol = int((row.get("賣權成交量") or "0").replace(",", ""))
+            call_oi = int((row.get("買權未平倉量") or "0").replace(",", ""))
+            put_oi = int((row.get("賣權未平倉量") or "0").replace(",", ""))
+        except ValueError:
+            continue
+        out.append(
+            {
+                "date": d,
+                "call_vol": call_vol,
+                "put_vol": put_vol,
+                "pcr_vol": round(put_vol / call_vol, 4) if call_vol else None,
+                "call_oi": call_oi,
+                "put_oi": put_oi,
+                "pcr_oi": round(put_oi / call_oi, 4) if call_oi else None,
+            }
+        )
+    return out
+
+
+async def fetch_put_call_ratio(start: date, end: date) -> list[dict[str, Any]]:
+    """期交所官方 臺指選擇權(TXO) Put/Call 比 CSV 下載（區間上限 30 日，由呼叫端分段）。"""
+    form = {
+        "queryStartDate": start.strftime("%Y/%m/%d"),
+        "queryEndDate": end.strftime("%Y/%m/%d"),
+        "down_type": "",
+        "product_type": "1",
+    }
+    try:
+        text = await http_util.throttled_post_text(_PCR_URL, form, headers=_PCR_HEADERS)
+    except Exception:
+        logger.exception("fetch_put_call_ratio failed")
+        return []
+    if not text or text.lstrip().startswith("<"):
+        # 非 CSV（錯誤頁/alert HTML，如區間超過 30 日）
+        logger.warning("put_call_ratio response is not CSV (start=%s end=%s)", start, end)
+        return []
+    return _parse_pcr_csv(text)

@@ -13,6 +13,12 @@ export interface DailyBar {
   short_balance: number | null;
   short_buy: number | null;
   short_sell: number | null;
+  call_vol: number | null;
+  put_vol: number | null;
+  pcr_vol: number | null;
+  call_oi: number | null;
+  put_oi: number | null;
+  pcr_oi: number | null;
 }
 
 export interface MinuteBar {

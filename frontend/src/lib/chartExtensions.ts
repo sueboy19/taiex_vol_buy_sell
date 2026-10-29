@@ -47,6 +47,30 @@ export function setupChartExtensions(): void {
     styles: { bars: [{ noChangeColor: "#ab47bc" }] } as never,
   } as never);
 
+  registerIndicator({
+    name: "PUT_CALL_RATIO",
+    shortName: "買賣權P/C比",
+    precision: 2,
+    calc: (dataList: Record<string, unknown>[]) =>
+      dataList.map((d) => ({
+        pcrVol: (d.pcr_vol as number) ?? null,
+        pcrOi: (d.pcr_oi as number) ?? null,
+        baseline: 1,
+      })),
+    figures: [
+      { key: "pcrVol", title: "成交量P/C: ", type: "line" },
+      { key: "pcrOi", title: "未平倉P/C: ", type: "line" },
+      { key: "baseline", title: "基準: ", type: "line" },
+    ],
+    styles: {
+      lines: [
+        { color: "#ff9800" },
+        { color: "#42a5f5" },
+        { color: "#787b86", style: "dashed" },
+      ],
+    } as never,
+  } as never);
+
   registerOverlay({
     name: "arrowLine",
     totalStep: 3,

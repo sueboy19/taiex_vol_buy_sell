@@ -122,6 +122,7 @@ export function Chart({
 
     chart.createIndicator("VOL", false, { id: "vol_pane", height: 120, dragEnabled: true } as never);
     chart.createIndicator("FOREIGN_FUTURE", false, { id: "ff_pane", height: 100, dragEnabled: true } as never);
+    chart.createIndicator("PUT_CALL_RATIO", false, { id: "pcr_pane", height: 100, dragEnabled: true } as never);
     chart.createIndicator("MARGIN_PURCHASE", false, { id: "margin_buy_pane", height: 100, dragEnabled: true } as never);
     chart.createIndicator("MARGIN_SHORTSALE", false, { id: "margin_short_pane", height: 100, dragEnabled: true } as never);
 
@@ -144,12 +145,12 @@ export function Chart({
     return () => ro.disconnect();
   }, []);
 
-  // 大盤 K 線佔約 1/3：4 個副圖平分其餘 2/3
+  // 大盤 K 線佔約 1/3：5 個副圖平分其餘 2/3
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || containerH === 0) return;
-    const subH = Math.max(70, Math.round(((containerH - 30) * 2) / 3 / 4));
-    for (const id of ["vol_pane", "ff_pane", "margin_buy_pane", "margin_short_pane"]) {
+    const subH = Math.max(70, Math.round(((containerH - 30) * 2) / 3 / 5));
+    for (const id of ["vol_pane", "ff_pane", "pcr_pane", "margin_buy_pane", "margin_short_pane"]) {
       chart.setPaneOptions({ id, height: subH } as never);
     }
   }, [containerH]);

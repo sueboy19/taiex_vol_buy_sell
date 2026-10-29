@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     http_timeout_sec: float = 15.0
     http_min_interval_sec: float = 3.0
     taifex_backfill_days: int = 90
+    # 買賣權 Put/Call 比回填天數（期交所 CSV 一次最多 30 日，內部自動分段）
+    pcr_backfill_days: int = 365
 
     # 允許跨源的來源（逗號分隔，含 scheme，例如 https://taiex.mkinweb.com）。
     # "*" 時為公開唯讀 API：自動停用 credentials（瀏覽器規範不允許 * + credentials）。
