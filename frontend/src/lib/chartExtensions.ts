@@ -63,10 +63,12 @@ export function setupChartExtensions(): void {
       { key: "baseline", title: "基準: ", type: "line" },
     ],
     styles: {
+      // klinecharts 的 lines 樣式若提供「不完整」物件會整組取代預設值，
+      // 缺 size/dashedValue 等欄位會在繪製時拋 TypeError 導致整條線不畫，欄位必須補齊。
       lines: [
-        { color: "#ff9800" },
-        { color: "#42a5f5" },
-        { color: "#787b86", style: "dashed" },
+        { color: "#ff9800", size: 1, style: "solid", dashedValue: [2, 2], smooth: false },
+        { color: "#42a5f5", size: 1, style: "solid", dashedValue: [2, 2], smooth: false },
+        { color: "#787b86", size: 1, style: "dashed", dashedValue: [4, 2], smooth: false },
       ],
     } as never,
   } as never);
