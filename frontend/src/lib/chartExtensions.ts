@@ -100,6 +100,30 @@ export function setupChartExtensions(): void {
     } as never,
   } as never);
 
+  registerIndicator({
+    name: "OPTION_OI",
+    shortName: "選擇權未平倉(口)",
+    precision: 0,
+    calc: (dataList: Record<string, unknown>[]) =>
+      dataList.map((d) => ({
+        callOi: (d.call_oi as number) ?? null,
+        // 鏡像柱狀：賣權取負值向下畫，與買權以 0 軸對稱，兩邊堆積強弱一眼可比
+        putOi: d.put_oi != null ? -(d.put_oi as number) : null,
+      })),
+    figures: [
+      { key: "callOi", title: "買權OI: ", type: "bar", baseValue: 0 },
+      { key: "putOi", title: "賣權OI: ", type: "bar", baseValue: 0 },
+    ],
+    styles: {
+      // 樣式欄位補齊（同 lines 教訓，避免渲染例外）：買權紅向上、賣權綠向下，
+      // 與融資(紅)/融券(綠)慣例一致；up/down/noChange 同色（靜態色）
+      bars: [
+        { style: "fill", borderSize: 1, borderStyle: "solid", borderDashedValue: [2, 2], upColor: "#ef5350", downColor: "#ef5350", noChangeColor: "#ef5350" },
+        { style: "fill", borderSize: 1, borderStyle: "solid", borderDashedValue: [2, 2], upColor: "#26a69a", downColor: "#26a69a", noChangeColor: "#26a69a" },
+      ],
+    } as never,
+  } as never);
+
   registerOverlay({
     name: "arrowLine",
     totalStep: 3,
