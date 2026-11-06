@@ -74,27 +74,43 @@ export function setupChartExtensions(): void {
           pcrVol,
           pcrVolMa5: ma5,
           pcrOi: (d.pcr_oi as number) ?? null,
-          baseline: 1,
           indexRel:
             baseClose !== null && close !== null ? close / baseClose : null,
         };
       });
     },
     figures: [
+      // 未平倉 P/C 比：以 1.0 為中軸的雙向柱（>1 紅柱向上、<1 綠柱向下），
+      // 與大盤對照線同框，偏向一眼可讀（偏空↓綠、偏多↑紅）
+      // 註：klinecharts indicator bar 預設一律畫 noChangeColor，up/down 色須由
+      // figure 的 styles callback 自行比 baseValue 切換（內建 VOL 即此做法）
+      {
+        key: "pcrOi",
+        title: "未平倉P/C: ",
+        type: "bar",
+        baseValue: 1,
+        styles: ({ current }: { current: { indicatorData?: { pcrOi?: number | null } } }) => {
+          const v = current.indicatorData?.pcrOi;
+          return {
+            color: v == null ? "#787b86" : v > 1 ? "#ef5350" : v < 1 ? "#26a69a" : "#787b86",
+          };
+        },
+      },
       { key: "pcrVol", title: "成交量P/C: ", type: "line" },
       { key: "pcrVolMa5", title: "P/C均5: ", type: "line" },
-      { key: "pcrOi", title: "未平倉P/C: ", type: "line" },
-      { key: "baseline", title: "基準: ", type: "line" },
       { key: "indexRel", title: "大盤(=1): ", type: "line" },
     ],
     styles: {
+      // bars 樣式欄位須補齊（同 lines 教訓，避免渲染例外）：
+      // bar 以 baseValue=1 比色 → 大於 1 紅、小於 1 綠、等於 1 灰
+      bars: [
+        { style: "fill", borderSize: 1, borderStyle: "solid", borderDashedValue: [2, 2], upColor: "#ef5350", downColor: "#26a69a", noChangeColor: "#787b86" },
+      ],
       // klinecharts 的 lines 樣式若提供「不完整」物件會整組取代預設值，
       // 缺 size/dashedValue 等欄位會在繪製時拋 TypeError 導致整條線不畫，欄位必須補齊。
       lines: [
         { color: "#ff9800", size: 1, style: "solid", dashedValue: [2, 2], smooth: false },
         { color: "#e65100", size: 1, style: "solid", dashedValue: [2, 2], smooth: false },
-        { color: "#42a5f5", size: 1, style: "solid", dashedValue: [2, 2], smooth: false },
-        { color: "#787b86", size: 1, style: "dashed", dashedValue: [4, 2], smooth: false },
         { color: "#37474f", size: 1, style: "solid", dashedValue: [2, 2], smooth: false },
       ],
     } as never,
