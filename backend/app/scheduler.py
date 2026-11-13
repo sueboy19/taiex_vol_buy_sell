@@ -382,6 +382,16 @@ def start_scheduler() -> None:
         run_date=now_tw(),
         id="backfill_init",
     )
+    # 每日收盤後再跑一次缺口回填（FinMind 融資市值/成交量等只有這裡會補；
+    # 僅靠啟動時跑一次，容器長期不重啟會造成市值凍結、單日漏抓永不補）
+    _scheduler.add_job(
+        job_backfill_check,
+        "cron",
+        hour=21,
+        minute=30,
+        day_of_week="mon-fri",
+        id="backfill_daily",
+    )
 
     _scheduler.start()
     logger.info("Scheduler started")
